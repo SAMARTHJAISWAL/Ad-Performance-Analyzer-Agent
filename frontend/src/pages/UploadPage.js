@@ -11,7 +11,7 @@ const UploadPage = () => {
         formData.append('file', file);
 
         try {
-            const response = await axios.post('http://127.0.0.1:5005/api/upload', formData);
+            const response = await axios.post('https://ad-performance-analyzer-agent.onrender.com/api/upload', formData);
             alert(response.data);
             navigate('/analyze', { state: { fileName: file.name } });
         } catch (error) {
