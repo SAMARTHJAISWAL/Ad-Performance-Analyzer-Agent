@@ -10,7 +10,7 @@ const AnalyzePage = () => {
     useEffect(() => {
         const fetchAnalysis = async () => {
             try {
-                const response = await axios.post('http://127.0.0.1:5005/api/analyze', { fileName });
+                const response = await axios.post('https://ad-performance-analyzer-agent.onrender.com/api/analyze', { fileName });
                 setResults(response.data); // Save the results from the API
             } catch (error) {
                 console.error('Error fetching analysis results:', error);
