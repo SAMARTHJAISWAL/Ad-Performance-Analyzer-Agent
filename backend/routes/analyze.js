@@ -7,7 +7,7 @@ const router = express.Router();
 
 // POST /api/analyze
 router.post('/', async (req, res) => {
-    const fileName = req.body.fileName; // Expect the client to send the uploaded file name
+    const fileName = req.body.fileName;
 
     if (!fileName) {
         return res.status(400).send('File name is required.');
