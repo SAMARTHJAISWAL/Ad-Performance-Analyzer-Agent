@@ -1,115 +1,64 @@
-const express = require("express");
-const path = require("path");
-const fs = require("fs");
-const csvParser = require("csv-parser");
+const express = require('express');
+const fs = require('fs');
+const csvParser = require('csv-parser');
+const { classifyRows } = require('../lib/performance');
+const { summarize } = require('../lib/summary');
+const { resolveUpload } = require('../lib/uploads');
 
 const router = express.Router();
 
-// POST /api/analyze
-router.post("/", async (req, res) => {
-  console.log("Received request at /api/analyze");
-  console.log("Request body:", req.body);
+function readCsv(filePath) {
+  return new Promise((resolve, reject) => {
+    const rows = [];
+    fs.createReadStream(filePath)
+      .on('error', reject)
+      .pipe(csvParser())
+      .on('data', (row) => rows.push(row))
+      .on('end', () => resolve(rows))
+      .on('error', reject);
+  });
+}
 
-  const fileName = req.body.fileName;
-
-  if (!fileName) {
-    console.log("File name is missing in the request.");
-    return res.status(400).send("File name is required.");
+// POST /api/analyze  { "fileName": "ads.csv" }
+router.post('/', async (req, res) => {
+  const filePath = resolveUpload(req.body && req.body.fileName);
+  if (!filePath) {
+    return res.status(400).json({ error: 'A valid .csv fileName is required.' });
   }
-
-  const filePath = path.join(__dirname, "../uploads", fileName);
-  console.log("File path:", filePath);
-
-  // Check if file exists
   if (!fs.existsSync(filePath)) {
-    console.log("File not found:", filePath);
-    return res.status(404).send("File not found.");
+    return res.status(404).json({ error: 'File not found. Upload it first.' });
   }
 
-  const keywords = [];
-  const highPerforming = [];
-  const lowPerforming = [];
+  let rows;
+  try {
+    rows = await readCsv(filePath);
+  } catch (err) {
+    console.error('Error reading CSV:', err);
+    return res.status(500).json({ error: 'Error processing file.' });
+  }
 
-  console.log("Starting to read the CSV file...");
+  const analysis = classifyRows(rows);
 
-  // Read and parse the CSV file
-  fs.createReadStream(filePath)
-    .on("error", (err) => {
-      console.error("Error opening file:", err);
-      return res.status(500).send("Error opening file.");
-    })
-    .pipe(csvParser())
-    .on("data", (row) => {
-      console.log("Row keys:", Object.keys(row));
-      console.log("Processing row:", row); // Log every row for debugging
+  let summary = null;
+  let summaryError = null;
+  try {
+    summary = await summarize(analysis);
+  } catch (err) {
+    // The rule-based analysis is still useful without the LLM summary.
+    console.error('Gemini summary failed:', err.message);
+    summaryError = 'LLM summary unavailable.';
+  }
 
-      const cleanedRow = Object.keys(row).reduce((acc, key) => {
-        const cleanedKey = key.replace(/^["'\s]+|["'\s]+$/g, '');  
-        acc[cleanedKey] = row[key];
-        return acc;
-      }, {});
-      
-      console.log("Cleaned Row keys:", Object.keys(cleanedRow)); 
-      
-      const keyword = cleanedRow["Matched product"]; // Use the cleaned key
-      const clicks = row["Clicks"];
-      const CTR = row["CTR"];
-      const ACOS = row["ACOS"];
-      const ROAS = row["ROAS"];
-
-      console.log(
-        `Extracted values - Keyword: ${keyword}, Clicks: ${clicks}, CTR: ${CTR}, ACOS: ${ACOS}, ROAS: ${ROAS}`
-      );
-
-      // Convert values to numbers for comparison
-      const numClicks = parseFloat(clicks);
-      const numCTR = parseFloat(CTR);
-      const numACOS = parseFloat(ACOS);
-      const numROAS = parseFloat(ROAS);
-
-      if (
-        isNaN(numClicks) ||
-        isNaN(numCTR) ||
-        isNaN(numACOS) ||
-        isNaN(numROAS)
-      ) {
-        console.log("Skipping row due to invalid data:", row);
-        return;
-      }
-
-      if (numROAS > 5 && numACOS < 30 && numCTR > 0.1) {
-        console.log(`High-performing keyword detected: ${keyword}`);
-        highPerforming.push(keyword);
-      } else {
-        console.log(`Low-performing keyword detected: ${keyword}`);
-        lowPerforming.push(keyword);
-      }
-
-      keywords.push({
-        keyword,
-        clicks: numClicks,
-        CTR: numCTR,
-        ACOS: numACOS,
-        ROAS: numROAS,
-      });
-    })
-    .on("end", () => {
-      console.log("CSV file processing completed.");
-      console.log("Total keywords:", keywords.length);
-      console.log("High-performing keywords:", highPerforming);
-      console.log("Low-performing keywords:", lowPerforming);
-
-      res.json({
-        message: "Analysis completed.",
-        totalKeywords: keywords.length,
-        highPerforming,
-        lowPerforming,
-      });
-    })
-    .on("error", (err) => {
-      console.error("Error processing file:", err);
-      res.status(500).send("Error processing file.");
-    });
+  res.json({
+    message: 'Analysis completed.',
+    totalKeywords: analysis.keywords.length,
+    skippedRows: analysis.skipped,
+    highPerforming: analysis.highPerforming,
+    lowPerforming: analysis.lowPerforming,
+    keywords: analysis.keywords,
+    summary,
+    ...(summaryError && { summaryError }),
+  });
 });
 
 module.exports = router;

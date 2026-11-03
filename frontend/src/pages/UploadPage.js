@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { api } from '../api';
 import FileUpload from '../components/FileUpload';
 
 const UploadPage = () => {
@@ -11,12 +11,12 @@ const UploadPage = () => {
         formData.append('file', file);
 
         try {
-            const response = await axios.post('https://ad-performance-analyzer-agent.onrender.com/api/upload', formData);
+            const response = await api.post('/upload', formData);
             alert(response.data);
             navigate('/analyze', { state: { fileName: file.name } });
         } catch (error) {
             console.error('Upload failed:', error.response || error);
-            alert('File upload failed.');
+            alert(error.response?.data || 'File upload failed.');
         }
     };
 

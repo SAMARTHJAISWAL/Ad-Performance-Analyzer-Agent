@@ -1,48 +1,42 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import axios from 'axios';
+import { Link, useLocation } from 'react-router-dom';
+import { api } from '../api';
+import AnalysisResults from '../components/AnalysisResults';
 
 const AnalyzePage = () => {
     const location = useLocation();
-    const { fileName } = location.state || {}; // Get the file name from the previous page's state
+    const { fileName } = location.state || {}; // Set by UploadPage after a successful upload
     const [results, setResults] = useState(null);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
+        if (!fileName) return;
         const fetchAnalysis = async () => {
             try {
-                const response = await axios.post('https://ad-performance-analyzer-agent.onrender.com/api/analyze', { fileName });
-                setResults(response.data); // Save the results from the API
-            } catch (error) {
-                console.error('Error fetching analysis results:', error);
-                alert('Failed to fetch analysis results.');
+                const response = await api.post('/analyze', { fileName });
+                setResults(response.data);
+            } catch (err) {
+                console.error('Error fetching analysis results:', err);
+                setError(err.response?.data?.error || 'Failed to fetch analysis results.');
             }
         };
-
-        if (fileName) {
-            fetchAnalysis();
-        }
+        fetchAnalysis();
     }, [fileName]);
 
-    if (!results) return <p>Loading analysis results...</p>; // Show a loading message while fetching data
+    if (!fileName) {
+        return (
+            <div>
+                <h1>Analysis Results</h1>
+                <p>No file selected. <Link to="/upload">Upload a CSV</Link> first.</p>
+            </div>
+        );
+    }
 
     return (
         <div>
-            <h1>Analysis Results</h1>
-            <h3>{results.message}</h3>
-
-            <h2>High-Performing Keywords</h2>
-            <ul>
-                {results.highPerforming.map((keyword, index) => (
-                    <li key={index}>{keyword}</li>
-                ))}
-            </ul>
-
-            <h2>Low-Performing Keywords</h2>
-            <ul>
-                {results.lowPerforming.map((keyword, index) => (
-                    <li key={index}>{keyword}</li>
-                ))}
-            </ul>
+            <h1>Analysis Results: {fileName}</h1>
+            {error ? <p role="alert">{error}</p> : <AnalysisResults results={results} />}
+            <p><Link to="/upload">Analyse another file</Link></p>
         </div>
     );
 };

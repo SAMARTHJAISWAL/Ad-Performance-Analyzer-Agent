@@ -1,136 +1,175 @@
 # Ad Performance Analyzer
 
-## **Project Overview**
-The Ad Performance Analyzer is a web application designed to analyze advertisement data and provide insights into ad performance. Users can upload CSV files containing ad data, and the system evaluates the keywords to identify high- and low-performing keywords. The application consists of a **React-based frontend**, a **Node.js backend**, and integrates with an LLM (Large Language Model) to process and summarize the ad performance. This tool helps marketers and advertisers make data-driven decisions by highlighting areas of improvement and recommending changes to optimize their campaigns.
+A small web app for checking which ad keywords are pulling their weight. Upload a CSV export of
+keyword metrics. The backend sorts each keyword into **high-performing** or **low-performing** using
+fixed ROAS / ACOS / CTR thresholds. If a Gemini API key is set, it also writes a short summary with
+suggested next steps.
 
----
+## Features
 
-## **Architecture Diagram**
+- **CSV upload** (`.csv` only, 10 MB limit by default) through a React page or `POST /api/upload`.
+- **Rule-based classification.** A keyword is high-performing when **ROAS > 5**, **ACOS < 30** and
+  **CTR > 0.1**. Every other keyword is low-performing. Rows with no keyword or with non-numeric
+  metrics are skipped and counted.
+- **Flexible headers.** Header matching ignores case, quotes and the BOM. The keyword can be in a
+  `keyword`, `Matched product`, `Search term` or `Targeting` column. Values such as `12%` or
+  `$1,200` are parsed as numbers.
+- **Optional AI summary.** When `GEMINI_API_KEY` is set, `/api/analyze` asks Gemini (via
+  [`@google/genai`](https://www.npmjs.com/package/@google/genai), model `gemini-flash-latest` by
+  default) for a short list of strengths, weaknesses and actions. Without a key, or if the call
+  fails, you still get the rule-based results.
 
-```plaintext
-+-------------+           +------------------+          +------------------+           +---------------------+
-|  Frontend   |   ---->   |  Backend (Node)  |   ---->  |  LangChain Agent |   ---->   |     LLM API         |
-|   (React)   |           |    /api/upload   |          | Analyze Keywords |           |                     |
-|             |           |   /api/analyze   |          |  Adjust Keywords |           |                     |
-+-------------+           +------------------+          +------------------+           +---------------------+
+## Tech stack
+
+| Part     | Stack                                                                  |
+| -------- | ---------------------------------------------------------------------- |
+| Frontend | React 19, React Router 6, axios, Create React App (`react-scripts` 5)  |
+| Backend  | Node.js (>= 20), Express 4, express-fileupload, csv-parser, dotenv     |
+| AI       | Google Gen AI SDK (`@google/genai`), optional                          |
+| Tests    | Node's built-in test runner (`node --test`)                            |
+
+## Architecture
+
+```
+React (CRA, :3000)                Express API (:5005)
+  /upload  ── multipart CSV ──▶  POST /api/upload   → backend/uploads/<name>.csv
+  /analyze ── { fileName } ───▶  POST /api/analyze  → csv-parser
+                                                      → lib/performance.js (thresholds)
+                                                      → lib/summary.js (Gemini, if key set)
 ```
 
----
+- `backend/lib/performance.js`: pure classification logic, covered by unit tests.
+- `backend/lib/uploads.js`: reduces client-supplied names to a plain `.csv` base name inside the
+  upload directory, which blocks path traversal.
+- `backend/lib/summary.js`: builds the prompt and makes the optional Gemini call.
 
-## **Setup Instructions**
+## Environment variables
 
-Follow these steps to set up and run the project locally:
+Backend (`backend/.env`; copy from `backend/.env.example`):
 
-### **Backend Setup**
-1. Clone the repository and navigate to the `backend` folder:
-   ```bash
-   git clone <repo-url>
-   cd AdPerformanceAnalyzer/backend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Set up a `.env` file in the `backend` directory:
-   ```plaintext
-   PORT=5005
-   OPENAI_API_KEY=<your-openai-api-key>
-   ```
-4. Start the backend server:
-   ```bash
-   node index.js
-   ```
+| Variable         | Required | Default                | Purpose                                         |
+| ---------------- | -------- | ---------------------- | ----------------------------------------------- |
+| `PORT`           | no       | `5005`                 | API port                                        |
+| `GEMINI_API_KEY` | no       | none                   | Turns on the AI summary in `/api/analyze`       |
+| `GEMINI_MODEL`   | no       | `gemini-flash-latest`  | Gemini model id                                 |
+| `CORS_ORIGIN`    | no       | allow all              | Comma-separated list of allowed origins         |
+| `MAX_UPLOAD_MB`  | no       | `10`                   | Upload size limit                               |
+| `UPLOAD_DIR`     | no       | `backend/uploads`      | Where uploaded CSVs are stored                  |
 
-### **Frontend Setup**
-1. Navigate to the `frontend` folder:
-   ```bash
-   cd ../frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the frontend development server:
-   ```bash
-   npm start
-   ```
-4. Open your browser at `http://localhost:3000`.
+Frontend (`frontend/.env`; copy from `frontend/.env.example`):
 
----
+| Variable            | Required | Default                 | Purpose                                     |
+| ------------------- | -------- | ----------------------- | ------------------------------------------- |
+| `REACT_APP_API_URL` | no       | `http://localhost:5005` | Backend base URL (read at build/start time) |
 
-## **API Documentation**
+## Getting started
 
-### **1. `/api/upload` (POST)**
-- **Description**: Uploads a CSV file containing ad data.
-- **Request**:
-  - Content-Type: `multipart/form-data`
-  - Body:
-    ```bash
-    file=@path/to/ad-data.csv
-    ```
-- **Response**:
-  - Success:
-    ```json
-    { "message": "File uploaded successfully: test.csv" }
-    ```
-  - Error:
-    ```json
-    { "error": "File upload failed" }
-    ```
+Requires Node.js 20 or newer (tested with Node 26).
 
-### **2. `/api/analyze` (POST)**
-- **Description**: Analyzes the uploaded CSV file for keyword performance.
-- **Request**:
-  - Content-Type: `application/json`
-  - Body:
-    ```json
-    { "fileName": "test.csv" }
-    ```
-- **Response**:
-  - Success:
-    ```json
-    {
-      "message": "Analysis completed.",
-      "totalKeywords": 3,
-      "highPerforming": ["keyword1", "keyword3"],
-      "lowPerforming": ["keyword2"]
-    }
-    ```
-  - Error:
-    ```json
-    { "error": "Analysis failed" }
-    ```
+```bash
+# Backend
+cd backend
+npm install
+cp .env.example .env        # optionally add GEMINI_API_KEY
+npm start                   # http://127.0.0.1:5005
 
----
+# Frontend (in a second terminal)
+cd frontend
+npm install
+npm start                   # http://localhost:3000
+```
 
-## **Assumptions**
-1. The input CSV file adheres to the required format and contains valid ad data.
-2. The target audience for this tool includes digital marketers and advertisers looking to optimize their campaigns.
-3. The LLM API is available and provides responses within a reasonable time.
-4. The frontend and backend will run on the same machine during development.
+Then go to **Upload Ad Data**, choose a CSV (for example `backend/sample/ad-data.csv`) and the
+results page opens.
 
----
+### Scripts
 
-## **Future Improvements**
-1. **Enhanced Data Validation**:
-   - Validate the uploaded CSV file format and content to ensure proper analysis.
-   
-2. **Improved UI/UX**:
-   - Add better styling and user interaction, including file upload progress indicators.
+| Location   | Command         | What it does                         |
+| ---------- | --------------- | ------------------------------------ |
+| `backend`  | `npm start`     | Start the API                        |
+| `backend`  | `npm run dev`   | Start the API with `node --watch`    |
+| `backend`  | `npm test`      | Run the unit tests                   |
+| `frontend` | `npm start`     | CRA dev server                       |
+| `frontend` | `npm run build` | Production build into `frontend/build` |
 
-3. **Historical Data Tracking**:
-   - Store historical analyses in a database to allow users to track performance over time.
+## CSV format
 
-4. **Advanced Reporting**:
-   - Generate downloadable PDF or Excel reports with detailed keyword insights and recommendations.
+```csv
+keyword,clicks,CTR,ACOS,ROAS
+running shoes,100,0.2,25,6
+trail sneakers,50,0.15,35,4
+```
 
-5. **User Authentication**:
-   - Add login functionality to allow multiple users to access and manage their data securely.
+Required columns: a keyword column (see above), `clicks`, `CTR`, `ACOS`, `ROAS`. Header case does
+not matter.
 
-6. **Support for Multiple Languages**:
-   - Enhance the LLM prompts to work with ad data in multiple languages for global users.
+## API
 
-7. **Integration with Ad Platforms**:
-   - Directly fetch ad data from platforms like Google Ads or Facebook Ads instead of requiring manual uploads.
+### `POST /api/upload`
 
----
+`multipart/form-data` with a `file` field holding a `.csv` file.
+
+```bash
+curl -F file=@backend/sample/ad-data.csv http://localhost:5005/api/upload
+# File uploaded successfully: ad-data.csv
+```
+
+Errors: `400` when no file is sent or the file is not a `.csv`; `413` when it is over the size limit.
+
+### `POST /api/analyze`
+
+```bash
+curl -X POST http://localhost:5005/api/analyze \
+  -H 'Content-Type: application/json' \
+  -d '{"fileName":"ad-data.csv"}'
+```
+
+```json
+{
+  "message": "Analysis completed.",
+  "totalKeywords": 4,
+  "skippedRows": 0,
+  "highPerforming": ["running shoes", "waterproof boots"],
+  "lowPerforming": ["trail sneakers", "cheap sandals"],
+  "keywords": [{ "keyword": "running shoes", "clicks": 100, "CTR": 0.2, "ACOS": 25, "ROAS": 6 }],
+  "summary": null
+}
+```
+
+`summary` holds the Gemini text when a key is set. If the Gemini call fails, `summaryError` is
+included as well. Errors: `400` for a missing or invalid `fileName`; `404` when that file has not
+been uploaded.
+
+### `GET /`
+
+Health check that returns a plain-text message.
+
+## Project structure
+
+```
+backend/
+  index.js            Express app (exports app; listens when run directly)
+  routes/upload.js    POST /api/upload
+  routes/analyze.js   POST /api/analyze
+  lib/performance.js  Classification logic
+  lib/summary.js      Optional Gemini summary
+  lib/uploads.js      Upload path handling
+  sample/ad-data.csv  Example input
+  test/               node:test unit tests
+frontend/
+  src/api.js          axios instance (REACT_APP_API_URL)
+  src/pages/          Dashboard, UploadPage, AnalyzePage
+  src/components/     FileUpload, AnalysisResults
+.github/workflows/ci.yml  Backend tests + frontend build
+```
+
+## Deployment notes
+
+- Uploaded files are written to the server's local disk (`UPLOAD_DIR`). On hosts with ephemeral
+  disks, files can disappear between the upload request and the analyze request. There is no
+  authentication and no clean-up of old uploads.
+- Build the frontend with `REACT_APP_API_URL` set to the deployed API URL, and set `CORS_ORIGIN`
+  on the backend to the frontend's origin.
+- `npm audit` reports advisories in the frontend's `react-scripts` 5 toolchain (build-time
+  dependencies). Fixing them means moving off Create React App (for example to Vite). That move is
+  not done here.
