@@ -3,21 +3,23 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-  "start": "node index.js",
-  "build": "npm install"
-}
-,
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node --test test/*.test.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "API for the Ad Performance Analyzer: CSV upload, rule-based keyword classification, optional Gemini summary",
   "dependencies": {
-    "axios": "^1.7.9",
+    "@google/genai": "^2.32.0",
     "cors": "^2.8.5",
     "csv-parser": "^3.1.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "express-fileupload": "^1.5.1",
-    "openai": "^4.80.1"
-}
+    "express-fileupload": "^1.5.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
 }
