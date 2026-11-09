@@ -10,7 +10,7 @@ npm install
 cp .env.example .env   # optional: set VITE_API_URL (default http://localhost:5005)
 npm run dev            # dev server on http://localhost:3000 (npm start is an alias)
 npm test               # Vitest + Testing Library (jsdom)
-npm run build          # production build into dist/
+npm run build          # production build into build/
 npm run preview        # serve the production build locally
 ```
 

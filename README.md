@@ -94,7 +94,7 @@ results page opens.
 | `backend`  | `npm run dev`   | Start the API with `node --watch`    |
 | `backend`  | `npm test`      | Run the unit tests                   |
 | `frontend` | `npm run dev`   | Vite dev server on :3000 (`npm start` is an alias) |
-| `frontend` | `npm run build` | Production build into `frontend/dist` |
+| `frontend` | `npm run build` | Production build into `frontend/build` |
 | `frontend` | `npm run preview` | Serve the production build locally |
 | `frontend` | `npm test`      | Run the Vitest tests                 |
 
@@ -176,5 +176,5 @@ frontend/
   authentication and no clean-up of old uploads.
 - Build the frontend with `VITE_API_URL` set to the deployed API URL, and set `CORS_ORIGIN`
   on the backend to the frontend's origin.
-- The frontend build output is a static site in `frontend/dist`. Since the app uses client-side
+- The frontend build output is a static site in `frontend/build` (the same folder Create React App used). Since the app uses client-side
   routing, configure the host to serve `index.html` for unknown paths (e.g. `/upload`).
