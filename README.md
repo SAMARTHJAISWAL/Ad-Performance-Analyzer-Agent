@@ -178,3 +178,7 @@ frontend/
   on the backend to the frontend's origin.
 - The frontend build output is a static site in `frontend/build` (the same folder Create React App used). Since the app uses client-side
   routing, configure the host to serve `index.html` for unknown paths (e.g. `/upload`).
+
+## Licence
+
+[MIT](LICENSE) © 2025–2026 Samarth Jaiswal
