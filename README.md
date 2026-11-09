@@ -23,15 +23,15 @@ suggested next steps.
 
 | Part     | Stack                                                                  |
 | -------- | ---------------------------------------------------------------------- |
-| Frontend | React 19, React Router 6, axios, Create React App (`react-scripts` 5)  |
+| Frontend | React 19, React Router 6, axios, Vite 8                                |
 | Backend  | Node.js (>= 20), Express 4, express-fileupload, csv-parser, dotenv     |
 | AI       | Google Gen AI SDK (`@google/genai`), optional                          |
-| Tests    | Node's built-in test runner (`node --test`)                            |
+| Tests    | Backend: Node's test runner (`node --test`); frontend: Vitest + Testing Library |
 
 ## Architecture
 
 ```
-React (CRA, :3000)                Express API (:5005)
+React (Vite, :3000)               Express API (:5005)
   /upload  ── multipart CSV ──▶  POST /api/upload   → backend/uploads/<name>.csv
   /analyze ── { fileName } ───▶  POST /api/analyze  → csv-parser
                                                       → lib/performance.js (thresholds)
@@ -58,13 +58,17 @@ Backend (`backend/.env`; copy from `backend/.env.example`):
 
 Frontend (`frontend/.env`; copy from `frontend/.env.example`):
 
-| Variable            | Required | Default                 | Purpose                                     |
-| ------------------- | -------- | ----------------------- | ------------------------------------------- |
-| `REACT_APP_API_URL` | no       | `http://localhost:5005` | Backend base URL (read at build/start time) |
+| Variable       | Required | Default                 | Purpose                                     |
+| -------------- | -------- | ----------------------- | ------------------------------------------- |
+| `VITE_API_URL` | no       | `http://localhost:5005` | Backend base URL (read at build/start time) |
+
+`VITE_API_URL` replaces the old Create React App name `REACT_APP_API_URL`; rename it in any existing
+`frontend/.env` or deployment settings.
 
 ## Getting started
 
-Requires Node.js 20 or newer (tested with Node 26).
+Requires Node.js 20 or newer for the backend, and Node.js 20.19+ or 22.12+ for the frontend (Vite 8);
+tested with Node 26.
 
 ```bash
 # Backend
@@ -76,7 +80,7 @@ npm start                   # http://127.0.0.1:5005
 # Frontend (in a second terminal)
 cd frontend
 npm install
-npm start                   # http://localhost:3000
+npm run dev                 # http://localhost:3000 (npm start also works)
 ```
 
 Then go to **Upload Ad Data**, choose a CSV (for example `backend/sample/ad-data.csv`) and the
@@ -89,8 +93,10 @@ results page opens.
 | `backend`  | `npm start`     | Start the API                        |
 | `backend`  | `npm run dev`   | Start the API with `node --watch`    |
 | `backend`  | `npm test`      | Run the unit tests                   |
-| `frontend` | `npm start`     | CRA dev server                       |
-| `frontend` | `npm run build` | Production build into `frontend/build` |
+| `frontend` | `npm run dev`   | Vite dev server on :3000 (`npm start` is an alias) |
+| `frontend` | `npm run build` | Production build into `frontend/dist` |
+| `frontend` | `npm run preview` | Serve the production build locally |
+| `frontend` | `npm test`      | Run the Vitest tests                 |
 
 ## CSV format
 
@@ -157,10 +163,10 @@ backend/
   sample/ad-data.csv  Example input
   test/               node:test unit tests
 frontend/
-  src/api.js          axios instance (REACT_APP_API_URL)
+  src/api.js          axios instance (VITE_API_URL)
   src/pages/          Dashboard, UploadPage, AnalyzePage
   src/components/     FileUpload, AnalysisResults
-.github/workflows/ci.yml  Backend tests + frontend build
+.github/workflows/ci.yml  Backend tests + frontend tests and build
 ```
 
 ## Deployment notes
@@ -168,8 +174,7 @@ frontend/
 - Uploaded files are written to the server's local disk (`UPLOAD_DIR`). On hosts with ephemeral
   disks, files can disappear between the upload request and the analyze request. There is no
   authentication and no clean-up of old uploads.
-- Build the frontend with `REACT_APP_API_URL` set to the deployed API URL, and set `CORS_ORIGIN`
+- Build the frontend with `VITE_API_URL` set to the deployed API URL, and set `CORS_ORIGIN`
   on the backend to the frontend's origin.
-- `npm audit` reports advisories in the frontend's `react-scripts` 5 toolchain (build-time
-  dependencies). Fixing them means moving off Create React App (for example to Vite). That move is
-  not done here.
+- The frontend build output is a static site in `frontend/dist`. Since the app uses client-side
+  routing, configure the host to serve `index.html` for unknown paths (e.g. `/upload`).
